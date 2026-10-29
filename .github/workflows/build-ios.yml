@@ -22,6 +22,13 @@ jobs:
         run: |
           autoreconf -fi
 
+      - name: Fix configure libuv syntax error
+        run: |
+          # Fix the libuv syntax error in generated configure script
+          # Replace the broken ARIA2_ARG_WITH(libuv) call with proper shell code
+          sed -i.bak 's/ARIA2_ARG_WITH(libuv)/if test "x$with_libuv" = "xyes"; then :; fi/' configure 2>/dev/null || \
+          sed -i 's/ARIA2_ARG_WITH(libuv)//' configure
+
       - name: Configure aria2 for iOS
         run: |
           ./configure \
