@@ -14,64 +14,23 @@ jobs:
         with:
           ref: ios-build
 
-      - name: Install build tools
+      - name: Install dependencies via Homebrew
         run: |
           brew install automake libtool openssl@3 pkg-config
+          # c-ares, libssh2, expat, zlib are included in macOS or can be installed via brew
+          brew install c-ares libssh2 expat zlib
 
-      - name: Download and build c-ares (static)
-        run: |
-          curl -L https://c-ares.org/download/c-ares-1.33.1.tar.gz -o /tmp/cares.tar.gz
-          tar -xzf /tmp/cares.tar.gz -C /tmp
-          cd /tmp/c-ares-1.33.1
-          ./configure --host=aarch64-apple-darwin --build=x86_64-apple-darwin \
-            --prefix=/tmp/cares-ios --disable-__attribute__
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
-
-      - name: Download and build libssh2 (static)
-        run: |
-          curl -L https://github.com/libssh2/libssh2/releases/download/v1.11.1/libssh2-1.11.1.tar.gz -o /tmp/libssh2.tar.gz
-          tar -xzf /tmp/libssh2.tar.gz -C /tmp
-          cd /tmp/libssh2-1.11.1
-          cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/tmp/libssh2-ios \
-            -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DBUILD_TESTING=OFF -DOPENSSL_CRYPTO_LIBRARY=/usr/local/lib \
-            -DOPENSSL_SSL_LIBRARY=/usr/local/lib
-          cmake --build build -j$(sysctl -n hw.logicalcpu)
-          cmake --install build
-
-      - name: Download and build expat (static)
-        run: |
-          curl -L https://github.com/libexpat/libexpat/releases/download/R_2_6_2/expat-2.6.2.tar.gz -o /tmp/expat.tar.gz
-          tar -xzf /tmp/expat.tar.gz -C /tmp
-          cd /tmp/expat-2.6.2
-          cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/tmp/expat-ios \
-            -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
-          cmake --build build -j$(sysctl -n hw.logicalcpu)
-          cmake --install build
-
-      - name: Download and build zlib (static)
-        run: |
-          curl -L https://zlib.net/zlib-1.3.1.tar.gz -o /tmp/zlib.tar.gz
-          tar -xzf /tmp/zlib.tar.gz -C /tmp
-          cd /tmp/zlib-1.3.1
-          CC=clang AR=ar CFLAGS="-O3 -arch arm64" ./configure --prefix=/tmp/zlib-ios
-          make -j$(sysctl -n hw.logicalcpu)
-          make install PREFIX=/tmp/zlib-ios
-
-      - name: Configure aria2 for iOS
+      - name: Configure aria2 for iOS (cross-compile)
         run: |
           autoreconf -fi
           ./configure \
             --host=aarch64-apple-darwin \
-            --build=x86_64-apple-darwin \
+            --build=$(uname -m)-apple-darwin \
             --with-openssl=$(brew --prefix openssl@3) \
-            --with-libexpat=/tmp/expat-ios \
-            --with-libcares=/tmp/cares-ios \
-            --with-libssh2=/tmp/libssh2-ios \
-            --with-zlib=/tmp/zlib-ios \
+            --with-libexpat=$(brew --prefix expat) \
+            --with-libcares=$(brew --prefix c-ares) \
+            --with-libssh2=$(brew --prefix libssh2) \
+            --with-zlib=$(brew --prefix zlib) \
             --disable-nls \
             --without-gnutls \
             --without-sqlite3 \
@@ -79,7 +38,9 @@ jobs:
             --disable-ftp \
             --disable-sftp \
             --disable-metalink \
-            --disable-torrent
+            --disable-torrent \
+            CFLAGS="-arch arm64 -isysroot $(xcrun -sdk iphoneos --show-sdk-path)" \
+            LDFLAGS="-arch arm64 -isysroot $(xcrun -sdk iphoneos --show-sdk-path) -mios-version-min=15.0"
 
       - name: Build
         run: make -j$(sysctl -n hw.logicalcpu)
