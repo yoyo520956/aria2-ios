@@ -61,7 +61,7 @@ jobs:
         run: make -j$(sysctl -n hw.logicalcpu)
 
       - name: Upload aria2c binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aria2c-ios-arm64
           path: src/aria2c
